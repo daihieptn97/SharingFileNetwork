@@ -18,7 +18,5 @@ yarn start
 
 ## DEMO 
 
-```
-![alt text](demo02.png "Title")
+![alt text](./demo02.png "Title")
 
-```
