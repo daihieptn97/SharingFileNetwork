@@ -1,131 +1,315 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Ứng dụng chia sẻ file</title>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-  <style>
-    body { padding-top: 30px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Ứng dụng chia sẻ file & Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 30px;
+        }
+
+        /* Định dạng khung chat kiểu Messenger */
+        .chat-message {
+            max-width: 80%;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+
+        .chat-message.me {
+            background-color: #dcf8c6;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .chat-message.other {
+            background-color: #fff;
+            margin-right: auto;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        /* Vùng hiển thị QR code ở góc trên bên phải */
+        #qrCodeContainer {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 5px;
+            cursor: pointer; /* Thêm cursor pointer để báo hiệu có thể hover */
+            transition: transform 0.3s ease, box-shadow 0.3s ease; /* Thêm transition cho hiệu ứng hover */
+        }
+
+        #qrCodeContainer:hover {
+            transform: scale(1.05); /* Nhẹ nhàng scale lên khi hover */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); /* Thêm bóng đổ nhẹ */
+        }
+
+        /* QR code lớn hơn, ẩn ban đầu */
+        #expandedQrCodeContainer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.1); /* Scale nhỏ ban đầu */
+            z-index: 1001; /* Đảm bảo hiển thị trên cùng */
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 10px;
+            opacity: 0; /* Trong suốt ban đầu */
+            transition: transform 0.3s ease, opacity 0.3s ease; /* Transition cho hiệu ứng zoom và fade */
+        }
+
+        #expandedQrCodeContainer.expanded {
+            transform: translate(-50%, -50%) scale(1); /* Scale lớn khi expanded */
+            opacity: 1; /* Hiển thị khi expanded */
+        }
+
+        #expandedQrCode {
+            width: 50vw; /* Chiều rộng bằng nửa viewport width */
+            height: 50vw; /* Chiều cao bằng nửa viewport width (để đảm bảo vuông) */
+            max-width: 50vh; /* Giới hạn chiều rộng tối đa bằng nửa viewport height */
+            max-height: 50vh; /* Giới hạn chiều cao tối đa bằng nửa viewport height */
+            margin-bottom: 10px;
+        }
+
+        /* Điều chỉnh chiều cao khung chat cho mobile */
+        @media (max-width: 576px) {
+            #chatArea {
+                height: 50vh;
+            }
+        }
+
+        @media (min-width: 577px) {
+            #chatArea {
+                height: 300px;
+            }
+        }
+    </style>
 </head>
+
 <body>
-<div class="container">
-  <h1 class="mb-4">Chia sẻ file giữa 2 người dùng</h1>
-
-  <h4>Máy đang kết nối:</h4>
-  <ul id="clientList" class="list-group mb-4"></ul>
-
-  <div class="form-group">
-    <label for="fileInput">Chọn file cần gửi:</label>
-    <input type="file" id="fileInput" class="form-control">
-  </div>
-  <button id="sendFile" class="btn btn-primary">Gửi file</button>
-
-  <div class="mt-4">
-    <h4>Tiến trình truyền file:</h4>
-    <div class="progress">
-      <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+    <div id="qrCodeContainer">
+        <div id="qrCode"></div>
+        <small class="d-block text-center">Quét để tham gia</small>
     </div>
-  </div>
 
-  <div id="downloadLink" class="mt-4"></div>
-</div>
+    <div id="expandedQrCodeContainer">
+        <div id="expandedQrCode"></div>
+        <small class="d-block text-center">Quét để tham gia</small>
+    </div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  const socket = io();
-  const clientList = document.getElementById('clientList');
 
-  // Cập nhật danh sách client và hiển thị thông tin trình duyệt, hệ điều hành
-  socket.on('update-clients', (clients) => {
-    clientList.innerHTML = '';
-    clients.forEach(client => {
-      let li = document.createElement('li');
-      li.className = 'list-group-item';
-      li.textContent = `Client: ${client.id} | ${client.browser} | ${client.os} | Thiết bị: ${client.device}`;
-      clientList.appendChild(li);
-    });
-  });
+    <div class="container">
+        <h1 class="mb-4">Chia sẻ file & Chat giữa các thiết bị</h1>
 
-  const fileInput = document.getElementById('fileInput');
-  const sendFileBtn = document.getElementById('sendFile');
-  const progressBar = document.getElementById('progressBar');
-  let fileReader;
-  let file;
-  let chunkSize = 64 * 1024; // 64KB
-  let offset = 0;
+        <h4>Máy đang kết nối:</h4>
+        <ul id="clientList" class="list-group mb-4"></ul>
 
-  sendFileBtn.addEventListener('click', () => {
-    if (fileInput.files.length === 0) return;
-    file = fileInput.files[0];
+        <div class="form-group">
+            <label for="fileInput">Chọn file cần gửi:</label>
+            <input type="file" id="fileInput" class="form-control">
+        </div>
+        <button id="sendFile" class="btn btn-primary btn-block mb-3">Gửi file</button>
 
-    // Gửi metadata của file
-    socket.emit('file-meta', {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
+        <div class="mt-4">
+            <h4>Tiến trình truyền file:</h4>
+            <div class="progress">
+                <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+            </div>
+        </div>
+        <div id="downloadLink" class="mt-4"></div>
 
-    offset = 0;
-    readChunk();
-  });
+        <div class="card mt-4">
+            <div class="card-header">
+                Phòng Chat
+            </div>
+            <div class="card-body" id="chatArea" style="overflow-y: auto;">
+                </div>
+            <div class="card-footer">
+                <div class="input-group">
+                    <input type="text" id="chatInput" class="form-control" placeholder="Nhập tin nhắn">
+                    <div class="input-group-append">
+                        <button id="sendChat" class="btn btn-primary">Gửi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  function readChunk() {
-    const slice = file.slice(offset, offset + chunkSize);
-    fileReader = new FileReader();
-    fileReader.onload = (e) => {
-      console.log('Sending chunk from offset:', offset);
-      socket.emit('file-chunk', { chunk: e.target.result, offset: offset });
-      offset += e.target.result.byteLength;
-      const percent = Math.min(100, Math.floor((offset / file.size) * 100));
-      progressBar.style.width = percent + '%';
-      progressBar.innerHTML = percent + '%';
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/1.0.2/ua-parser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let mySocketId = null; // Sẽ lưu socket id của chính client
 
-      if (offset < file.size) {
-        readChunk();
-      }
-    };
-    fileReader.readAsArrayBuffer(slice);
-  }
+        // Lấy socket id sau khi kết nối
+        socket.on('connect', () => {
+            mySocketId = socket.id;
+            console.log("Connected with socket id:", mySocketId);
+        });
 
-  let receivedFileMeta;
-  let receivedChunks = [];
-  let receivedSize = 0;
+        // Khởi tạo QR code nhỏ ban đầu
+        new QRCode(document.getElementById("qrCode"), {
+            text: window.location.href,
+            width: 100,
+            height: 100
+        });
 
-  socket.on('file-meta', (data) => {
-    console.log('Received file-meta:', data);
-    receivedFileMeta = data;
-    receivedChunks = [];
-    receivedSize = 0;
-    progressBar.style.width = '0%';
-    progressBar.innerHTML = '0%';
-    document.getElementById('downloadLink').innerHTML = '';
-  });
+        // Khởi tạo QR code lớn (ẩn)
+        const expandedQrCode = new QRCode(document.getElementById("expandedQrCode"), {
+            text: window.location.href,
+            width: 500, // Kích thước lớn hơn, có thể điều chỉnh
+            height: 500
+        });
 
-  socket.on('file-chunk', (data) => {
-    console.log('Received file-chunk at offset:', data.offset);
-    receivedChunks.push(data.chunk);
-    receivedSize += data.chunk.byteLength;
-    const percent = Math.min(100, Math.floor((receivedSize / receivedFileMeta.fileSize) * 100));
-    progressBar.style.width = percent + '%';
-    progressBar.innerHTML = percent + '%';
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+        const expandedQrCodeContainer = document.getElementById('expandedQrCodeContainer');
 
-    if (receivedSize >= receivedFileMeta.fileSize) {
-      const blob = new Blob(receivedChunks, { type: receivedFileMeta.fileType });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = receivedFileMeta.fileName;
-      link.className = 'btn btn-success';
-      link.innerHTML = 'Tải file: ' + receivedFileMeta.fileName;
-      document.getElementById('downloadLink').appendChild(link);
+        qrCodeContainer.addEventListener('mouseover', () => {
+            expandedQrCodeContainer.classList.add('expanded'); // Thêm class để hiển thị và zoom lớn
+        });
 
-      // Reset lại biến sau khi hoàn thành
-      receivedFileMeta = null;
-      receivedChunks = [];
-      receivedSize = 0;
-    }
-  });
-</script>
+        qrCodeContainer.addEventListener('mouseout', () => {
+            expandedQrCodeContainer.classList.remove('expanded'); // Xóa class để ẩn và zoom nhỏ lại
+        });
+
+
+        // Cập nhật danh sách client đang kết nối
+        const clientList = document.getElementById('clientList');
+        socket.on('update-clients', (clients) => {
+            clientList.innerHTML = '';
+            clients.forEach(client => {
+                let li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = `Client: ${client.id} | ${client.browser} | ${client.os} | Thiết bị: ${client.device}`;
+                li.style.color = client.color; // Hiển thị màu riêng của client
+                clientList.appendChild(li);
+            });
+        });
+
+        // --- Chức năng gửi file ---
+        const fileInput = document.getElementById('fileInput');
+        const sendFileBtn = document.getElementById('sendFile');
+        const progressBar = document.getElementById('progressBar');
+        let fileReader, file;
+        const chunkSize = 64 * 1024; // 64KB
+        let offset = 0;
+
+        sendFileBtn.addEventListener('click', () => {
+            if (fileInput.files.length === 0) return;
+            file = fileInput.files[0];
+
+            socket.emit('file-meta', {
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type
+            });
+
+            offset = 0;
+            readChunk();
+        });
+
+        function readChunk() {
+            const slice = file.slice(offset, offset + chunkSize);
+            fileReader = new FileReader();
+            fileReader.onload = (e) => {
+                console.log('Sending chunk from offset:', offset);
+                socket.emit('file-chunk', { chunk: e.target.result, offset: offset });
+                offset += e.target.result.byteLength;
+                const percent = Math.min(100, Math.floor((offset / file.size) * 100));
+                progressBar.style.width = percent + '%';
+                progressBar.innerHTML = percent + '%';
+
+                if (offset < file.size) {
+                    readChunk();
+                }
+            };
+            fileReader.readAsArrayBuffer(slice);
+        }
+
+        let receivedFileMeta, receivedChunks = [], receivedSize = 0;
+        socket.on('file-meta', (data) => {
+            console.log('Received file-meta:', data);
+            receivedFileMeta = data;
+            receivedChunks = [];
+            receivedSize = 0;
+            progressBar.style.width = '0%';
+            progressBar.innerHTML = '0%';
+            document.getElementById('downloadLink').innerHTML = '';
+        });
+        socket.on('file-chunk', (data) => {
+            console.log('Received file-chunk at offset:', data.offset);
+            receivedChunks.push(data.chunk);
+            receivedSize += data.chunk.byteLength;
+            const percent = Math.min(100, Math.floor((receivedSize / receivedFileMeta.fileSize) * 100));
+            progressBar.style.width = percent + '%';
+            progressBar.innerHTML = percent + '%';
+
+            if (receivedSize >= receivedFileMeta.fileSize) {
+                const blob = new Blob(receivedChunks, { type: receivedFileMeta.fileType });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = receivedFileMeta.fileName;
+                link.className = 'btn btn-success';
+                link.innerHTML = 'Tải file: ' + receivedFileMeta.fileName;
+                document.getElementById('downloadLink').appendChild(link);
+
+                receivedFileMeta = null;
+                receivedChunks = [];
+                receivedSize = 0;
+            }
+        });
+
+        // --- Chức năng Chat ---
+        const chatArea = document.getElementById('chatArea');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChat');
+
+        sendChatBtn.addEventListener('click', () => {
+            const text = chatInput.value.trim();
+            if (text !== '') {
+                socket.emit('chat-message', { text: text });
+                chatInput.value = '';
+            }
+        });
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatBtn.click();
+            }
+        });
+
+        // Xử lý khi nhận tin nhắn
+        socket.on('chat-message', (messageData) => {
+            const messageDiv = document.createElement('div');
+            // Xác định nếu tin nhắn của chính mình hay của người khác
+            const isMe = messageData.id === mySocketId;
+            messageDiv.classList.add('chat-message', isMe ? 'me' : 'other');
+
+            // Hiển thị tên user và tin nhắn với màu được gán
+            messageDiv.innerHTML = `
+        <small>
+          <strong style="color: ${messageData.color};">
+            ${messageData.username}
+          </strong>
+          [${new Date(messageData.timestamp).toLocaleTimeString()}]:
+        </small>
+        <p class="mb-0">${messageData.text}</p>
+      `;
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        });
+    </script>
 </body>
+
 </html>
