@@ -1,0 +1,16 @@
+{
+  "name": "file-share-app",
+  "version": "1.0.0",
+  "description": "Ứng dụng chia sẻ file qua mạng cục bộ sử dụng Node.js, Express và Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ip": "^2.0.1",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.6.1",
+    "ua-parser-js": "^2.0.2"
+  }
+}
