@@ -62,13 +62,13 @@ io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id} với màu ${color}`);
   io.emit('update-clients', Object.values(clients));
 
-  // Xử lý gửi file
+  // Xử lý gửi file: nhận file-meta và file-chunk cùng fileId
   socket.on('file-meta', (data) => {
     console.log(`Received file-meta từ ${socket.id}:`, data);
     socket.broadcast.emit('file-meta', data);
   });
   socket.on('file-chunk', (data) => {
-    console.log(`Received file-chunk từ ${socket.id} tại offset ${data.offset}`);
+    console.log(`Received file-chunk từ ${socket.id} của fileId ${data.fileId} tại offset ${data.offset}`);
     socket.broadcast.emit('file-chunk', data);
   });
 
